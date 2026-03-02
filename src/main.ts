@@ -2,6 +2,9 @@ import { presentationConfig } from "./presentation/config";
 import { PresentationController } from "./core/controller";
 import { summarizeDiff } from "./core/diff";
 import { LAYER_ORDER, SvgRenderer } from "./render/svg-renderer";
+import { mountShaderBackground } from "./shader-background";
+
+mountShaderBackground();
 
 const app = document.querySelector<HTMLDivElement>("#app");
 
@@ -74,8 +77,13 @@ if (app) {
 
   const renderer = new SvgRenderer(chartHost);
   const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  let latestTransitionId = 0;
   const controller = new PresentationController(presentationConfig.steps, {
-    onTransition: async ({ fromIndex, toIndex, previousStep, step, diff }) => {
+    onTransition: async ({ fromIndex, toIndex, previousStep, step, diff, transitionId }) => {
+      latestTransitionId = Math.max(latestTransitionId, transitionId);
+      stepMeta.textContent = `Step ${toIndex + 1} / ${presentationConfig.steps.length}: ${step.id}`;
+      diffMeta.textContent = `Diff: ${summarizeDiff(diff)}`;
+
       if (fromIndex === toIndex) {
         renderer.render(step.scene);
       } else {
@@ -86,6 +94,9 @@ if (app) {
         });
       }
 
+      if (transitionId !== latestTransitionId) {
+        return;
+      }
       stepMeta.textContent = `Step ${toIndex + 1} / ${presentationConfig.steps.length}: ${step.id}`;
       diffMeta.textContent = `Diff: ${summarizeDiff(diff)}`;
     },
@@ -130,7 +141,7 @@ if (app) {
 
 function styleButton(button: HTMLButtonElement): void {
   button.style.border = "1px solid #94a3b8";
-  button.style.background = "#f8fafc";
+  button.style.background = "transparent";
   button.style.color = "#0f172a";
   button.style.padding = "6px 10px";
   button.style.borderRadius = "8px";

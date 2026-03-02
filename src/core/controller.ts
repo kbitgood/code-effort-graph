@@ -10,6 +10,7 @@ export type StepTransition = {
   previousStep: PresentationStep;
   step: PresentationStep;
   diff: SceneDiff;
+  transitionId: number;
 };
 
 type ControllerOptions = {
@@ -19,7 +20,7 @@ type ControllerOptions = {
 export class PresentationController {
   private readonly steps: PresentationStep[];
   private readonly onTransition: ControllerOptions["onTransition"];
-  private transitionLocked = false;
+  private transitionSequence = 0;
 
   public currentStepIndex = 0;
 
@@ -38,6 +39,7 @@ export class PresentationController {
   emitCurrent(): void {
     const step = this.currentStep;
     const diff = diffScenes(step.scene, step.scene);
+    const transitionId = ++this.transitionSequence;
     void this.onTransition({
       fromIndex: this.currentStepIndex,
       toIndex: this.currentStepIndex,
@@ -45,10 +47,14 @@ export class PresentationController {
       previousStep: step,
       step,
       diff,
+      transitionId,
     });
   }
 
   next(): boolean {
+    if (this.currentStepIndex === this.steps.length - 1) {
+      return this.emitJumpToCurrent();
+    }
     return this.transitionTo(this.currentStepIndex + 1, "next");
   }
 
@@ -114,7 +120,6 @@ export class PresentationController {
   }
 
   private transitionTo(targetIndex: number, direction: TransitionDirection): boolean {
-    if (this.transitionLocked) return false;
     if (targetIndex < 0 || targetIndex >= this.steps.length) return false;
 
     const fromIndex = this.currentStepIndex;
@@ -126,26 +131,36 @@ export class PresentationController {
       return false;
     }
 
-    this.transitionLocked = true;
-    try {
-      const diff = diffScenes(fromStep.scene, toStep.scene);
-      this.currentStepIndex = targetIndex;
-      void Promise.resolve(
-        this.onTransition({
-          fromIndex,
-          toIndex: targetIndex,
-          direction,
-          previousStep: fromStep,
-          step: toStep,
-          diff,
-        }),
-      ).finally(() => {
-        this.transitionLocked = false;
-      });
-      return true;
-    } catch (error) {
-      this.transitionLocked = false;
-      throw error;
-    }
+    const diff = diffScenes(fromStep.scene, toStep.scene);
+    const transitionId = ++this.transitionSequence;
+    this.currentStepIndex = targetIndex;
+
+    void this.onTransition({
+      fromIndex,
+      toIndex: targetIndex,
+      direction,
+      previousStep: fromStep,
+      step: toStep,
+      diff,
+      transitionId,
+    });
+    return true;
+  }
+
+  private emitJumpToCurrent(): boolean {
+    const step = this.currentStep;
+    const transitionId = ++this.transitionSequence;
+    const diff = diffScenes(step.scene, step.scene);
+
+    void this.onTransition({
+      fromIndex: this.currentStepIndex,
+      toIndex: this.currentStepIndex,
+      direction: "jump",
+      previousStep: step,
+      step,
+      diff,
+      transitionId,
+    });
+    return true;
   }
 }

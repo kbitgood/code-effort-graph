@@ -47,6 +47,7 @@ export class SvgRenderer {
   private height: number;
   private margins: Margins;
   private readonly lineAnimator: LineAnimator;
+  private transitionVersion = 0;
 
   constructor(container: HTMLElement, options: RendererOptions = {}) {
     this.width = options.width ?? 920;
@@ -62,10 +63,10 @@ export class SvgRenderer {
     this.svg.setAttribute("role", "img");
     this.svg.setAttribute("aria-label", "Code effort graph scene");
     this.svg.style.display = "block";
-    this.svg.style.background = "#ffffff";
-    this.svg.style.border = "1px solid #cbd5e1";
-    this.svg.style.borderRadius = "12px";
-    this.svg.style.boxShadow = "0 8px 24px rgba(15, 23, 42, 0.08)";
+    this.svg.style.background = "transparent";
+    this.svg.style.border = "none";
+    this.svg.style.borderRadius = "0";
+    this.svg.style.boxShadow = "none";
 
     this.layers = {} as Record<LayerName, SVGGElement>;
     for (const name of LAYER_ORDER) {
@@ -79,6 +80,7 @@ export class SvgRenderer {
   }
 
   render(scene: SceneState): void {
+    this.transitionVersion += 1;
     this.clearAllLayers();
 
     this.renderAxes(scene.axes);
@@ -95,6 +97,7 @@ export class SvgRenderer {
     diff: SceneDiff,
     options: TransitionOptions,
   ): Promise<void> {
+    const version = ++this.transitionVersion;
     this.clearAllLayers();
 
     this.renderAxes(nextScene.axes);
@@ -124,7 +127,13 @@ export class SvgRenderer {
       const line = nextLineById.get(lineId);
       const path = renderedLines.get(lineId);
       if (!line || !path || !line.drawOnEnter) continue;
-      animationTasks.push(this.lineAnimator.animateDraw(path, { durationMs, easing }));
+      animationTasks.push(
+        this.lineAnimator.animateDraw(path, {
+          durationMs,
+          easing,
+          shouldCancel: () => this.transitionVersion !== version,
+        }),
+      );
     }
 
     for (const lineId of diff.lines.updated) {
@@ -137,6 +146,7 @@ export class SvgRenderer {
           durationMs,
           easing,
           buildPath: (points) => this.buildLinePath(nextScene.axes, points),
+          shouldCancel: () => this.transitionVersion !== version,
         }),
       );
     }

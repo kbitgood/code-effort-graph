@@ -6,11 +6,13 @@ type MorphOptions = {
   durationMs: number;
   easing: EasingName;
   buildPath: (points: BezierPoint[]) => string;
+  shouldCancel?: () => boolean;
 };
 
 type DrawOptions = {
   durationMs: number;
   easing: EasingName;
+  shouldCancel?: () => boolean;
 };
 
 export class LineAnimator {
@@ -22,6 +24,7 @@ export class LineAnimator {
     await animateValue({
       durationMs: options.durationMs,
       easing: options.easing,
+      shouldCancel: options.shouldCancel,
       onFrame: (progress) => {
         path.style.strokeDashoffset = String((1 - progress) * totalLength);
       },
@@ -45,6 +48,7 @@ export class LineAnimator {
     await animateValue({
       durationMs: options.durationMs,
       easing: options.easing,
+      shouldCancel: options.shouldCancel,
       onFrame: (progress) => {
         const current = interpolatePoints(fromPoints, toPoints, progress);
         path.setAttribute("d", options.buildPath(current));
@@ -96,6 +100,7 @@ function easingFunction(name: EasingName): (value: number) => number {
 async function animateValue(options: {
   durationMs: number;
   easing: EasingName;
+  shouldCancel?: () => boolean;
   onFrame: (progress: number) => void;
 }): Promise<void> {
   const easing = easingFunction(options.easing);
@@ -109,6 +114,11 @@ async function animateValue(options: {
     const start = performance.now();
 
     const tick = (now: number) => {
+      if (options.shouldCancel?.()) {
+        resolve();
+        return;
+      }
+
       const elapsed = now - start;
       const linearProgress = Math.min(1, elapsed / duration);
       options.onFrame(easing(linearProgress));

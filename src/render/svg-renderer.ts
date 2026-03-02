@@ -187,9 +187,9 @@ export class SvgRenderer {
   private renderAxes(axis: AxisConfig): void {
     const layer = this.layers.axes;
     const bounds = this.getChartBounds();
-    const axisColor = "#475569";
-    const tickColor = "#94a3b8";
-    const labelColor = "#1e293b";
+    const axisColor = "#000";
+    const tickColor = "#000";
+    const labelColor = "#000";
 
     if (axis.xVisible) {
       const yZero = this.toScreen(axis, { x: axis.xRange[0], y: 0 }).y;
@@ -223,7 +223,7 @@ export class SvgRenderer {
         const tickLabel = createSvg("text", {
           x: String(x),
           y: String(yZero + 22),
-          fill: "#64748b",
+          fill: "#000",
           "font-size": "12",
           "text-anchor": "middle",
         });
@@ -278,7 +278,7 @@ export class SvgRenderer {
         const tickLabel = createSvg("text", {
           x: String(xZero - 12),
           y: String(y + 4),
-          fill: "#64748b",
+          fill: "#000",
           "font-size": "12",
           "text-anchor": "end",
         });
@@ -310,7 +310,7 @@ export class SvgRenderer {
       const text = createSvg("text", {
         x: String(point.x),
         y: String(xAxisY - 20),
-        fill: "#0f172a",
+        fill: "#000",
         "font-size": "18",
         "font-weight": "700",
         "text-anchor": "middle",
@@ -328,7 +328,7 @@ export class SvgRenderer {
       const startLabel = createSvg("text", {
         x: String(this.getChartBounds().x),
         y: String(xAxisY + 36),
-        fill: "#334155",
+        fill: "#000",
         "font-size": "14",
         "font-weight": "600",
         "text-anchor": "start",
@@ -342,7 +342,7 @@ export class SvgRenderer {
       const endLabel = createSvg("text", {
         x: String(bounds.x + bounds.width),
         y: String(xAxisY + 36),
-        fill: "#334155",
+        fill: "#000",
         "font-size": "14",
         "font-weight": "600",
         "text-anchor": "end",
@@ -404,7 +404,7 @@ export class SvgRenderer {
       const text = createSvg("text", {
         x: String(labelPoint.x),
         y: String(labelPoint.y),
-        fill: line.style.color,
+        fill: "#000",
         "font-size": "14",
         "font-weight": "600",
       });

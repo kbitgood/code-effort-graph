@@ -21,8 +21,8 @@ export function mountShaderBackground(): void {
       createElement(Swirl, {
         blend: 50,
         speed: 0.3,
-        colorA: "#7090c5",
-        colorB: "#cdd7e3",
+        colorA: "#dbe9ff",
+        colorB: "#f5f9ff",
         detail: 1.6,
         opacity: 1,
         maskType: "alpha",

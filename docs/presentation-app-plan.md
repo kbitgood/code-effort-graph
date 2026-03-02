@@ -193,9 +193,9 @@ type PresentationConfig = {
 ## Implementation Order
 1. ✅Scaffold Bun app and dev server (`Bun.serve` + HTML entry).
 2. ✅Implement core types and presentation config.
-3. Build static SVG renderer and layer system.
-4. Build diff engine and navigation controller.
-5. Add line draw + morph animation.
+3. ✅Build static SVG renderer and layer system.
+4. ✅Build diff engine and navigation controller.
+5. ✅Add line draw + morph animation.
 6. Add band shading + label placement.
 7. Encode initial storyboard steps.
 8. Add tests.
@@ -213,4 +213,3 @@ type PresentationConfig = {
 - SVG path element + animation support: [developer.mozilla.org/.../SVG/Reference/Element/path](https://developer.mozilla.org/en-US/docs/Web/SVG/Reference/Element/path)
 - SVG path length for draw animation: [developer.mozilla.org/.../SVGPathElement/getTotalLength](https://developer.mozilla.org/en-US/docs/Web/API/SVGPathElement/getTotalLength)
 - Stroke dash attributes: [developer.mozilla.org/.../SVG/Reference/Attribute/stroke-dasharray](https://developer.mozilla.org/en-US/docs/Web/SVG/Reference/Attribute/stroke-dasharray)
-

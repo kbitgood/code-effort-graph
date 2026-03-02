@@ -73,9 +73,19 @@ if (app) {
   app.append(chartHost);
 
   const renderer = new SvgRenderer(chartHost);
+  const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const controller = new PresentationController(presentationConfig.steps, {
-    onTransition: ({ toIndex, step, diff }) => {
-      renderer.render(step.scene);
+    onTransition: async ({ fromIndex, toIndex, previousStep, step, diff }) => {
+      if (fromIndex === toIndex) {
+        renderer.render(step.scene);
+      } else {
+        await renderer.transition(previousStep.scene, step.scene, diff, {
+          durationMs: step.timing?.durationMs ?? presentationConfig.defaults.durationMs,
+          easing: step.timing?.easing ?? presentationConfig.defaults.easing,
+          reducedMotion: prefersReducedMotion,
+        });
+      }
+
       stepMeta.textContent = `Step ${toIndex + 1} / ${presentationConfig.steps.length}: ${step.id}`;
       diffMeta.textContent = `Diff: ${summarizeDiff(diff)}`;
     },
@@ -94,6 +104,13 @@ if (app) {
   step4.style.color = "#7c2d12";
   step4.style.fontWeight = "600";
   app.append(step4);
+
+  const step5 = document.createElement("p");
+  step5.textContent = "Step 5 complete: line draw-on-enter and line morph animation are enabled.";
+  step5.style.marginTop = "8px";
+  step5.style.color = "#14532d";
+  step5.style.fontWeight = "600";
+  app.append(step5);
 
   const controlsHint = document.createElement("p");
   controlsHint.textContent =

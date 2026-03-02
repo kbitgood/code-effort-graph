@@ -7,12 +7,13 @@ export type StepTransition = {
   fromIndex: number;
   toIndex: number;
   direction: TransitionDirection;
+  previousStep: PresentationStep;
   step: PresentationStep;
   diff: SceneDiff;
 };
 
 type ControllerOptions = {
-  onTransition: (transition: StepTransition) => void;
+  onTransition: (transition: StepTransition) => void | Promise<void>;
 };
 
 export class PresentationController {
@@ -37,10 +38,11 @@ export class PresentationController {
   emitCurrent(): void {
     const step = this.currentStep;
     const diff = diffScenes(step.scene, step.scene);
-    this.onTransition({
+    void this.onTransition({
       fromIndex: this.currentStepIndex,
       toIndex: this.currentStepIndex,
       direction: "jump",
+      previousStep: step,
       step,
       diff,
     });
@@ -128,16 +130,22 @@ export class PresentationController {
     try {
       const diff = diffScenes(fromStep.scene, toStep.scene);
       this.currentStepIndex = targetIndex;
-      this.onTransition({
-        fromIndex,
-        toIndex: targetIndex,
-        direction,
-        step: toStep,
-        diff,
+      void Promise.resolve(
+        this.onTransition({
+          fromIndex,
+          toIndex: targetIndex,
+          direction,
+          previousStep: fromStep,
+          step: toStep,
+          diff,
+        }),
+      ).finally(() => {
+        this.transitionLocked = false;
       });
       return true;
-    } finally {
+    } catch (error) {
       this.transitionLocked = false;
+      throw error;
     }
   }
 }

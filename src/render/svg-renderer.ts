@@ -1,3 +1,5 @@
+import { LineAnimator } from "../anim/line-animator";
+import type { SceneDiff } from "../core/diff";
 import type { AxisConfig, BandState, LineState, SceneState, Vec2, BezierPoint } from "../presentation/types";
 
 const SVG_NS = "http://www.w3.org/2000/svg";
@@ -14,6 +16,12 @@ type RendererOptions = {
     bottom: number;
     left: number;
   };
+};
+
+type TransitionOptions = {
+  durationMs: number;
+  easing: "linear" | "easeInOutCubic" | "easeOutCubic";
+  reducedMotion?: boolean;
 };
 
 type Margins = NonNullable<RendererOptions["margin"]>;
@@ -38,11 +46,13 @@ export class SvgRenderer {
   private width: number;
   private height: number;
   private margins: Margins;
+  private readonly lineAnimator: LineAnimator;
 
   constructor(container: HTMLElement, options: RendererOptions = {}) {
     this.width = options.width ?? 920;
     this.height = options.height ?? 520;
     this.margins = options.margin ?? DEFAULT_MARGINS;
+    this.lineAnimator = new LineAnimator();
 
     this.svg = document.createElementNS(SVG_NS, "svg");
     this.svg.setAttribute("viewBox", `0 0 ${this.width} ${this.height}`);
@@ -77,6 +87,63 @@ export class SvgRenderer {
     this.renderBands(scene.axes, scene.lines, scene.bands);
     this.renderLines(scene.axes, scene.lines);
     this.renderLineLabels(scene.axes, scene.lines);
+  }
+
+  async transition(
+    previousScene: SceneState,
+    nextScene: SceneState,
+    diff: SceneDiff,
+    options: TransitionOptions,
+  ): Promise<void> {
+    this.clearAllLayers();
+
+    this.renderAxes(nextScene.axes);
+    this.renderWords(nextScene.axes, nextScene.words);
+    this.renderEndpointTerms(nextScene.axes, nextScene.endpointTerms);
+    this.renderBands(nextScene.axes, nextScene.lines, nextScene.bands);
+
+    const previousLineById = new Map(previousScene.lines.map((line) => [line.id, line] as const));
+    const initialLinePoints = new Map<string, BezierPoint[]>();
+
+    for (const lineId of diff.lines.updated) {
+      const previousLine = previousLineById.get(lineId);
+      if (previousLine) {
+        initialLinePoints.set(lineId, previousLine.points);
+      }
+    }
+
+    const renderedLines = this.renderLineElements(nextScene.axes, nextScene.lines, initialLinePoints);
+    this.renderLineLabels(nextScene.axes, nextScene.lines);
+
+    const durationMs = options.reducedMotion ? 0 : options.durationMs;
+    const easing = options.easing;
+    const animationTasks: Array<Promise<void>> = [];
+    const nextLineById = new Map(nextScene.lines.map((line) => [line.id, line] as const));
+
+    for (const lineId of diff.lines.entered) {
+      const line = nextLineById.get(lineId);
+      const path = renderedLines.get(lineId);
+      if (!line || !path || !line.drawOnEnter) continue;
+      animationTasks.push(this.lineAnimator.animateDraw(path, { durationMs, easing }));
+    }
+
+    for (const lineId of diff.lines.updated) {
+      const previousLine = previousLineById.get(lineId);
+      const nextLine = nextLineById.get(lineId);
+      const path = renderedLines.get(lineId);
+      if (!previousLine || !nextLine || !path) continue;
+      animationTasks.push(
+        this.lineAnimator.animateMorph(path, previousLine.points, nextLine.points, {
+          durationMs,
+          easing,
+          buildPath: (points) => this.buildLinePath(nextScene.axes, points),
+        }),
+      );
+    }
+
+    if (animationTasks.length > 0) {
+      await Promise.all(animationTasks);
+    }
   }
 
   private clearAllLayers(): void {
@@ -276,9 +343,20 @@ export class SvgRenderer {
   }
 
   private renderLines(axis: AxisConfig, lines: LineState[]): void {
+    this.renderLineElements(axis, lines);
+  }
+
+  private renderLineElements(
+    axis: AxisConfig,
+    lines: LineState[],
+    initialPointsById: Map<string, BezierPoint[]> = new Map(),
+  ): Map<string, SVGPathElement> {
     const layer = this.layers.lines;
+    const renderedLines = new Map<string, SVGPathElement>();
+
     for (const line of lines) {
-      const d = this.buildLinePath(axis, line.points);
+      const initialPoints = initialPointsById.get(line.id) ?? line.points;
+      const d = this.buildLinePath(axis, initialPoints);
       if (!d) continue;
 
       const path = createSvg("path", {
@@ -292,7 +370,10 @@ export class SvgRenderer {
       });
       path.setAttribute("data-line-id", line.id);
       layer.append(path);
+      renderedLines.set(line.id, path);
     }
+
+    return renderedLines;
   }
 
   private renderLineLabels(axis: AxisConfig, lines: LineState[]): void {

@@ -20,6 +20,7 @@ export type WordDropItem = {
   id: string;
   text: string;
   xTarget: number;
+  yOffsetPx?: number;
 };
 
 export type EndpointTerms = {

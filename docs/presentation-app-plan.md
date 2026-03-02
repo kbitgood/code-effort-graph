@@ -197,7 +197,7 @@ type PresentationConfig = {
 4. ✅Build diff engine and navigation controller.
 5. ✅Add line draw + morph animation.
 6. ✅Add band shading + label placement.
-7. Encode initial storyboard steps.
+7. ✅Encode initial storyboard steps.
 8. Polish presentation.
 9. **User step** (not coding agent): write actual slides for presentation.
 10. Deploy to github pages.

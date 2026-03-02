@@ -109,7 +109,17 @@ export class SvgRenderer {
     this.clearAllLayers();
 
     this.renderAxes(nextScene.axes);
-    this.renderWords(nextScene.axes, nextScene.words);
+
+    const previousWordById = new Map(previousScene.words.map((word) => [word.id, word] as const));
+    const initialWordsById = new Map<string, SceneState["words"][number]>();
+    for (const wordId of diff.words.updated) {
+      const previousWord = previousWordById.get(wordId);
+      if (previousWord) {
+        initialWordsById.set(wordId, previousWord);
+      }
+    }
+
+    const renderedWords = this.renderWordElements(nextScene.axes, nextScene.words, initialWordsById);
     this.renderEndpointTerms(nextScene.axes, nextScene.endpointTerms);
     const renderedBands = this.renderBands(nextScene.axes, nextScene.lines, nextScene.bands);
 
@@ -129,7 +139,27 @@ export class SvgRenderer {
     const durationMs = options.reducedMotion ? 0 : options.durationMs;
     const easing = options.easing;
     const animationTasks: Array<Promise<void>> = [];
+    const nextWordById = new Map(nextScene.words.map((word) => [word.id, word] as const));
     const nextLineById = new Map(nextScene.lines.map((line) => [line.id, line] as const));
+
+    for (const wordId of diff.words.updated) {
+      const previousWord = previousWordById.get(wordId);
+      const nextWord = nextWordById.get(wordId);
+      const textElement = renderedWords.get(wordId);
+      if (!previousWord || !nextWord || !textElement) continue;
+      animationTasks.push(
+        this.animateWordMove(
+          textElement,
+          this.getWordScreenPosition(previousScene.axes, previousWord),
+          this.getWordScreenPosition(nextScene.axes, nextWord),
+          {
+            durationMs,
+            easing,
+            shouldCancel: () => this.transitionVersion !== version,
+          },
+        ),
+      );
+    }
 
     for (const bandId of diff.bands.entered) {
       const path = renderedBands.get(bandId);
@@ -239,21 +269,35 @@ export class SvgRenderer {
   }
 
   private renderWords(axis: AxisConfig, words: SceneState["words"]): void {
+    this.renderWordElements(axis, words);
+  }
+
+  private renderWordElements(
+    axis: AxisConfig,
+    words: SceneState["words"],
+    initialWordsById: Map<string, SceneState["words"][number]> = new Map(),
+  ): Map<string, SVGTextElement> {
     const layer = this.layers.words;
-    const xAxisY = this.toScreen(axis, { x: axis.xRange[0], y: 0 }).y;
+    const renderedWords = new Map<string, SVGTextElement>();
+
     for (const word of words) {
-      const point = this.toScreen(axis, { x: word.xTarget, y: 0 });
+      const initialWord = initialWordsById.get(word.id) ?? word;
+      const point = this.getWordScreenPosition(axis, initialWord);
       const text = createSvg("text", {
         x: String(point.x),
-        y: String(xAxisY - 20),
+        y: String(point.y),
         fill: "#000",
         "font-size": "18",
         "font-weight": "700",
         "text-anchor": "middle",
       });
       text.textContent = word.text;
+      text.setAttribute("data-word-id", word.id);
       layer.append(text);
+      renderedWords.set(word.id, text);
     }
+
+    return renderedWords;
   }
 
   private renderEndpointTerms(axis: AxisConfig, endpointTerms: SceneState["endpointTerms"]): void {
@@ -365,6 +409,35 @@ export class SvgRenderer {
     return renderedBands;
   }
 
+  private async animateWordMove(
+    textElement: SVGTextElement,
+    from: Vec2,
+    to: Vec2,
+    options: {
+      durationMs: number;
+      easing: EasingName;
+      shouldCancel?: () => boolean;
+    },
+  ): Promise<void> {
+    if (options.durationMs <= 0) {
+      textElement.setAttribute("x", String(to.x));
+      textElement.setAttribute("y", String(to.y));
+      return;
+    }
+
+    await animateProgress({
+      durationMs: options.durationMs,
+      easing: options.easing,
+      shouldCancel: options.shouldCancel,
+      onFrame: (progress) => {
+        const x = from.x + (to.x - from.x) * progress;
+        const y = from.y + (to.y - from.y) * progress;
+        textElement.setAttribute("x", String(x));
+        textElement.setAttribute("y", String(y));
+      },
+    });
+  }
+
   private async animateBandReveal(
     path: SVGPathElement,
     bandId: string,
@@ -439,6 +512,14 @@ export class SvgRenderer {
     }
 
     return commands.join(" ");
+  }
+
+  private getWordScreenPosition(axis: AxisConfig, word: SceneState["words"][number]): Vec2 {
+    const axisPoint = this.toScreen(axis, { x: word.xTarget, y: 0 });
+    return {
+      x: axisPoint.x,
+      y: axisPoint.y + (word.yOffsetPx ?? -20),
+    };
   }
 }
 

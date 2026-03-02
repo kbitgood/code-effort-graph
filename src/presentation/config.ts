@@ -1,11 +1,21 @@
 import type { LineState, PresentationConfig, WordDropItem } from "./types";
 
-const baseWords: WordDropItem[] = [
+const wordTargets: Array<Omit<WordDropItem, "yOffsetPx">> = [
   { id: "word-clarity", text: "Clarity", xTarget: 1.2 },
   { id: "word-speed", text: "Speed", xTarget: 2.5 },
   { id: "word-quality", text: "Quality", xTarget: 3.8 },
   { id: "word-impact", text: "Impact", xTarget: 5.1 },
 ];
+
+const wordsFloating: WordDropItem[] = wordTargets.map((word) => ({
+  ...word,
+  yOffsetPx: -128,
+}));
+
+const wordsSettled: WordDropItem[] = wordTargets.map((word) => ({
+  ...word,
+  yOffsetPx: -20,
+}));
 
 const baseAxes = {
   xVisible: true,
@@ -74,6 +84,38 @@ const supportLine: LineState = {
   ],
 };
 
+const lineOutcome: LineState = {
+  id: "line-core-effort",
+  style: baseLineStyle,
+  label: {
+    text: "Core Effort",
+  },
+  points: [
+    { x: 0.3, y: 1.7 },
+    { x: 1.4, y: 3.0, cpIn: { x: 0.9, y: 2.2 }, cpOut: { x: 1.8, y: 3.4 } },
+    { x: 2.8, y: 4.0, cpIn: { x: 2.3, y: 3.6 }, cpOut: { x: 3.2, y: 4.5 } },
+    { x: 4.2, y: 6.1, cpIn: { x: 3.7, y: 5.3 }, cpOut: { x: 4.7, y: 6.5 } },
+    { x: 5.6, y: 6.6, cpIn: { x: 5.1, y: 6.4 } },
+  ],
+};
+
+const supportLineOutcome: LineState = {
+  id: "line-support-load",
+  style: supportLineStyle,
+  label: {
+    text: "Support Load",
+    mode: "manual",
+    position: { x: 4.9, y: 5.7 },
+  },
+  points: [
+    { x: 0.3, y: 1.4 },
+    { x: 1.4, y: 2.4, cpIn: { x: 0.9, y: 1.9 }, cpOut: { x: 1.8, y: 2.8 } },
+    { x: 2.8, y: 3.4, cpIn: { x: 2.2, y: 3.0 }, cpOut: { x: 3.2, y: 3.7 } },
+    { x: 4.2, y: 5.3, cpIn: { x: 3.7, y: 4.6 }, cpOut: { x: 4.7, y: 5.8 } },
+    { x: 5.6, y: 6.0, cpIn: { x: 5.1, y: 5.8 } },
+  ],
+};
+
 export const presentationConfig: PresentationConfig = {
   defaults: {
     durationMs: 800,
@@ -89,7 +131,7 @@ export const presentationConfig: PresentationConfig = {
           yVisible: false,
           xLabel: "Timeline",
         },
-        words: baseWords,
+        words: wordsFloating,
         endpointTerms: {},
         lines: [],
         bands: [],
@@ -107,7 +149,7 @@ export const presentationConfig: PresentationConfig = {
           yVisible: false,
           xLabel: "Timeline",
         },
-        words: baseWords,
+        words: wordsSettled,
         endpointTerms: {},
         lines: [],
         bands: [],
@@ -193,7 +235,7 @@ export const presentationConfig: PresentationConfig = {
       },
     },
     {
-      id: "step-6-bands-and-labels",
+      id: "step-6-support-line-enter",
       timing: {
         durationMs: 900,
         easing: "easeInOutCubic",
@@ -242,6 +284,60 @@ export const presentationConfig: PresentationConfig = {
             opacity: 0.25,
           },
         ],
+      },
+    },
+    {
+      id: "step-8-band-update-and-line-morph",
+      timing: {
+        durationMs: 950,
+        easing: "easeInOutCubic",
+      },
+      scene: {
+        axes: {
+          ...baseAxes,
+          yVisible: true,
+          xLabel: "Timeline",
+          yLabel: "Code Effort",
+        },
+        words: [],
+        endpointTerms: {
+          start: "Problem",
+          end: "Outcome",
+        },
+        lines: [lineOutcome, supportLineOutcome],
+        bands: [
+          {
+            id: "band-gap-core-vs-support",
+            upperLineId: "line-core-effort",
+            lowerLineId: "line-support-load",
+            fill: "#93c5fd",
+            opacity: 0.18,
+            xMin: 0.8,
+            xMax: 5.2,
+          },
+        ],
+      },
+    },
+    {
+      id: "step-9-band-clear",
+      timing: {
+        durationMs: 700,
+        easing: "easeOutCubic",
+      },
+      scene: {
+        axes: {
+          ...baseAxes,
+          yVisible: true,
+          xLabel: "Timeline",
+          yLabel: "Code Effort",
+        },
+        words: [],
+        endpointTerms: {
+          start: "Problem",
+          end: "Outcome",
+        },
+        lines: [lineOutcome, supportLineOutcome],
+        bands: [],
       },
     },
   ],

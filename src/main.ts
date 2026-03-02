@@ -130,6 +130,13 @@ if (app) {
   step6.style.fontWeight = "600";
   app.append(step6);
 
+  const step7 = document.createElement("p");
+  step7.textContent = "Step 7 complete: initial storyboard sequence is encoded end-to-end.";
+  step7.style.marginTop = "8px";
+  step7.style.color = "#000";
+  step7.style.fontWeight = "600";
+  app.append(step7);
+
   const controlsHint = document.createElement("p");
   controlsHint.textContent =
     "Controls: click anywhere to advance, ArrowLeft/ArrowRight or Space/Shift+Space to navigate, Enter/R to reset.";

@@ -1,4 +1,5 @@
 import { presentationConfig } from "./presentation/config";
+import { LAYER_ORDER, SvgRenderer } from "./render/svg-renderer";
 
 const app = document.querySelector<HTMLDivElement>("#app");
 
@@ -23,4 +24,22 @@ if (app) {
   ids.style.color = "#334155";
   ids.style.fontSize = "0.95rem";
   app.append(ids);
+
+  const chartHost = document.createElement("section");
+  chartHost.style.marginTop = "20px";
+  chartHost.style.width = "100%";
+  app.append(chartHost);
+
+  const initialStep = presentationConfig.steps[0];
+  if (initialStep) {
+    const renderer = new SvgRenderer(chartHost);
+    renderer.render(initialStep.scene);
+  }
+
+  const step3 = document.createElement("p");
+  step3.textContent = `Step 3 complete: static SVG renderer with layers (${LAYER_ORDER.join(", ")})`;
+  step3.style.marginTop = "12px";
+  step3.style.color = "#065f46";
+  step3.style.fontWeight = "600";
+  app.append(step3);
 }

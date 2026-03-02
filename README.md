@@ -1,15 +1,12 @@
-# code-effort-graph
+# Code Effort Graph
 
-To install dependencies:
+This project is a simple presentation app for a work presentation.
+
+## Run locally
 
 ```bash
 bun install
+bun run dev
 ```
 
-To run:
-
-```bash
-bun run index.ts
-```
-
-This project was created using `bun init` in bun v1.3.5. [Bun](https://bun.com) is a fast all-in-one JavaScript runtime.
+Then open `http://localhost:3000` (or `3001` / `3002` if `3000` is in use).

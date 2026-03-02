@@ -21,6 +21,10 @@ export type WordDropItem = {
   text: string;
   xTarget: number;
   yOffsetPx?: number;
+  rotateDeg?: number;
+  opacity?: number;
+  fontSizePx?: number;
+  fontWeight?: number;
 };
 
 export type EndpointTerms = {

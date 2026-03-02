@@ -37,6 +37,12 @@ export class PresentationController {
   }
 
   emitCurrent(): void {
+    this.emitImmediate(this.currentStepIndex);
+  }
+
+  emitImmediate(index: number): boolean {
+    if (index < 0 || index >= this.steps.length) return false;
+    this.currentStepIndex = index;
     const step = this.currentStep;
     const diff = diffScenes(step.scene, step.scene);
     const transitionId = ++this.transitionSequence;
@@ -49,6 +55,7 @@ export class PresentationController {
       diff,
       transitionId,
     });
+    return true;
   }
 
   next(): boolean {
@@ -88,6 +95,9 @@ export class PresentationController {
         } else {
           this.next();
         }
+      } else if (event.key === "Enter" && event.shiftKey) {
+        event.preventDefault();
+        this.emitImmediate(this.steps.length - 1);
       } else if (event.key === "Enter") {
         event.preventDefault();
         this.reset();

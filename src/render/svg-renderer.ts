@@ -141,6 +141,20 @@ export class SvgRenderer {
     const durationMs = options.reducedMotion ? 0 : options.durationMs;
     const easing = options.easing;
     const animationTasks: Array<Promise<void>> = [];
+    const axisEntered =
+      (!previousScene.axes.xVisible && nextScene.axes.xVisible) ||
+      (!previousScene.axes.yVisible && nextScene.axes.yVisible);
+    if (axisEntered) {
+      this.layers.axes.setAttribute("opacity", "0");
+      animationTasks.push(
+        this.animateLayerOpacity(this.layers.axes, 0, 1, {
+          durationMs,
+          easing,
+          shouldCancel: () => this.transitionVersion !== version,
+        }),
+      );
+    }
+
     const nextWordById = new Map(nextScene.words.map((word) => [word.id, word] as const));
     const nextLineById = new Map(nextScene.lines.map((line) => [line.id, line] as const));
 
@@ -155,6 +169,10 @@ export class SvgRenderer {
           this.getWordScreenPosition(previousScene.axes, previousWord),
           this.getWordScreenPosition(nextScene.axes, nextWord),
           {
+            fromRotationDeg: previousWord.rotateDeg ?? 0,
+            toRotationDeg: nextWord.rotateDeg ?? 0,
+            fromOpacity: previousWord.opacity ?? 1,
+            toOpacity: nextWord.opacity ?? 1,
             durationMs,
             easing,
             shouldCancel: () => this.transitionVersion !== version,
@@ -226,6 +244,7 @@ export class SvgRenderer {
     this.defs.replaceChildren();
     for (const name of LAYER_ORDER) {
       this.layers[name].replaceChildren();
+      this.layers[name].removeAttribute("opacity");
     }
   }
 
@@ -253,6 +272,7 @@ export class SvgRenderer {
 
   private renderAxes(axis: AxisConfig): void {
     const layer = this.layers.axes;
+    layer.setAttribute("opacity", "1");
     const bounds = this.getChartBounds();
     const axisColor = "#000";
 
@@ -300,13 +320,14 @@ export class SvgRenderer {
       const initialWord = initialWordsById.get(word.id) ?? word;
       const point = this.getWordScreenPosition(axis, initialWord);
       const text = createSvg("text", {
-        x: String(point.x),
-        y: String(point.y),
         fill: "#000",
-        "font-size": "18",
-        "font-weight": "700",
+        "font-size": String(initialWord.fontSizePx ?? 18),
+        "font-weight": String(initialWord.fontWeight ?? 700),
+        "fill-opacity": String(initialWord.opacity ?? 1),
         "text-anchor": "middle",
+        "dominant-baseline": "middle",
       });
+      this.setWordPlacement(text, point, initialWord.rotateDeg ?? 0);
       text.textContent = word.text;
       text.setAttribute("data-word-id", word.id);
       layer.append(text);
@@ -425,10 +446,10 @@ export class SvgRenderer {
     return renderedBands;
   }
 
-  private async animateWordMove(
-    textElement: SVGTextElement,
-    from: Vec2,
-    to: Vec2,
+  private async animateLayerOpacity(
+    element: SVGGElement,
+    from: number,
+    to: number,
     options: {
       durationMs: number;
       easing: EasingName;
@@ -436,8 +457,38 @@ export class SvgRenderer {
     },
   ): Promise<void> {
     if (options.durationMs <= 0) {
-      textElement.setAttribute("x", String(to.x));
-      textElement.setAttribute("y", String(to.y));
+      element.setAttribute("opacity", String(to));
+      return;
+    }
+
+    await animateProgress({
+      durationMs: options.durationMs,
+      easing: options.easing,
+      shouldCancel: options.shouldCancel,
+      onFrame: (progress) => {
+        const value = from + (to - from) * progress;
+        element.setAttribute("opacity", String(value));
+      },
+    });
+  }
+
+  private async animateWordMove(
+    textElement: SVGTextElement,
+    from: Vec2,
+    to: Vec2,
+    options: {
+      fromRotationDeg: number;
+      toRotationDeg: number;
+      fromOpacity: number;
+      toOpacity: number;
+      durationMs: number;
+      easing: EasingName;
+      shouldCancel?: () => boolean;
+    },
+  ): Promise<void> {
+    if (options.durationMs <= 0) {
+      this.setWordPlacement(textElement, to, options.toRotationDeg);
+      textElement.setAttribute("fill-opacity", String(options.toOpacity));
       return;
     }
 
@@ -448,10 +499,22 @@ export class SvgRenderer {
       onFrame: (progress) => {
         const x = from.x + (to.x - from.x) * progress;
         const y = from.y + (to.y - from.y) * progress;
-        textElement.setAttribute("x", String(x));
-        textElement.setAttribute("y", String(y));
+        const rotation = options.fromRotationDeg + (options.toRotationDeg - options.fromRotationDeg) * progress;
+        this.setWordPlacement(textElement, { x, y }, rotation);
+        const opacity = options.fromOpacity + (options.toOpacity - options.fromOpacity) * progress;
+        textElement.setAttribute("fill-opacity", String(opacity));
       },
     });
+  }
+
+  private setWordPlacement(textElement: SVGTextElement, point: Vec2, rotationDeg = 0): void {
+    textElement.setAttribute("x", String(point.x));
+    textElement.setAttribute("y", String(point.y));
+    if (Math.abs(rotationDeg) < 1e-6) {
+      textElement.removeAttribute("transform");
+      return;
+    }
+    textElement.setAttribute("transform", `rotate(${rotationDeg} ${point.x} ${point.y})`);
   }
 
   private async animateBandReveal(

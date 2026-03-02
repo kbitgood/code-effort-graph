@@ -196,10 +196,11 @@ type PresentationConfig = {
 3. ✅Build static SVG renderer and layer system.
 4. ✅Build diff engine and navigation controller.
 5. ✅Add line draw + morph animation.
-6. Add band shading + label placement.
+6. ✅Add band shading + label placement.
 7. Encode initial storyboard steps.
-8. Add tests.
-9. Write docs in `docs/` and root `AGENTS.md`.
+8. Polish presentation.
+9. **User step** (not coding agent): write actual slides for presentation.
+10. Deploy to github pages.
 
 ## Sources
 - Bun HTML/static bundling: [bun.sh/docs/bundler/html](https://bun.sh/docs/bundler/html)

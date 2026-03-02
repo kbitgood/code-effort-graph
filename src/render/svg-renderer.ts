@@ -1,6 +1,8 @@
 import { LineAnimator } from "../anim/line-animator";
 import type { SceneDiff } from "../core/diff";
 import type { AxisConfig, BandState, LineState, SceneState, Vec2, BezierPoint } from "../presentation/types";
+import { buildBandPath } from "./band-generator";
+import { placeLineLabels } from "./label-placer";
 
 const SVG_NS = "http://www.w3.org/2000/svg";
 
@@ -33,6 +35,8 @@ type ChartBounds = {
   height: number;
 };
 
+type EasingName = TransitionOptions["easing"];
+
 const DEFAULT_MARGINS: Margins = {
   top: 40,
   right: 56,
@@ -42,6 +46,7 @@ const DEFAULT_MARGINS: Margins = {
 
 export class SvgRenderer {
   private svg: SVGSVGElement;
+  private defs: SVGDefsElement;
   private layers: Record<LayerName, SVGGElement>;
   private width: number;
   private height: number;
@@ -67,6 +72,9 @@ export class SvgRenderer {
     this.svg.style.border = "none";
     this.svg.style.borderRadius = "0";
     this.svg.style.boxShadow = "none";
+
+    this.defs = document.createElementNS(SVG_NS, "defs");
+    this.svg.append(this.defs);
 
     this.layers = {} as Record<LayerName, SVGGElement>;
     for (const name of LAYER_ORDER) {
@@ -103,7 +111,7 @@ export class SvgRenderer {
     this.renderAxes(nextScene.axes);
     this.renderWords(nextScene.axes, nextScene.words);
     this.renderEndpointTerms(nextScene.axes, nextScene.endpointTerms);
-    this.renderBands(nextScene.axes, nextScene.lines, nextScene.bands);
+    const renderedBands = this.renderBands(nextScene.axes, nextScene.lines, nextScene.bands);
 
     const previousLineById = new Map(previousScene.lines.map((line) => [line.id, line] as const));
     const initialLinePoints = new Map<string, BezierPoint[]>();
@@ -122,6 +130,18 @@ export class SvgRenderer {
     const easing = options.easing;
     const animationTasks: Array<Promise<void>> = [];
     const nextLineById = new Map(nextScene.lines.map((line) => [line.id, line] as const));
+
+    for (const bandId of diff.bands.entered) {
+      const path = renderedBands.get(bandId);
+      if (!path) continue;
+      animationTasks.push(
+        this.animateBandReveal(path, bandId, {
+          durationMs,
+          easing,
+          shouldCancel: () => this.transitionVersion !== version,
+        }),
+      );
+    }
 
     for (const lineId of diff.lines.entered) {
       const line = nextLineById.get(lineId);
@@ -157,6 +177,7 @@ export class SvgRenderer {
   }
 
   private clearAllLayers(): void {
+    this.defs.replaceChildren();
     for (const name of LAYER_ORDER) {
       this.layers[name].replaceChildren();
     }
@@ -188,8 +209,6 @@ export class SvgRenderer {
     const layer = this.layers.axes;
     const bounds = this.getChartBounds();
     const axisColor = "#000";
-    const tickColor = "#000";
-    const labelColor = "#000";
 
     if (axis.xVisible) {
       const yZero = this.toScreen(axis, { x: axis.xRange[0], y: 0 }).y;
@@ -202,47 +221,6 @@ export class SvgRenderer {
         "stroke-width": "2",
       });
       layer.append(xLine);
-
-      const tickCount = 6;
-      for (let i = 0; i <= tickCount; i += 1) {
-        const ratio = i / tickCount;
-        const domainX = axis.xRange[0] + ratio * (axis.xRange[1] - axis.xRange[0]);
-        const x = this.toScreen(axis, { x: domainX, y: 0 }).x;
-
-        layer.append(
-          createSvg("line", {
-            x1: String(x),
-            y1: String(yZero - 6),
-            x2: String(x),
-            y2: String(yZero + 6),
-            stroke: tickColor,
-            "stroke-width": "1.2",
-          }),
-        );
-
-        const tickLabel = createSvg("text", {
-          x: String(x),
-          y: String(yZero + 22),
-          fill: "#000",
-          "font-size": "12",
-          "text-anchor": "middle",
-        });
-        tickLabel.textContent = domainX.toFixed(1).replace(/\.0$/, "");
-        layer.append(tickLabel);
-      }
-
-      if (axis.xLabel) {
-        const label = createSvg("text", {
-          x: String(bounds.x + bounds.width / 2),
-          y: String(bounds.y + bounds.height + 52),
-          fill: labelColor,
-          "font-size": "14",
-          "font-weight": "600",
-          "text-anchor": "middle",
-        });
-        label.textContent = axis.xLabel;
-        layer.append(label);
-      }
     }
 
     if (axis.yVisible) {
@@ -257,48 +235,6 @@ export class SvgRenderer {
           "stroke-width": "2",
         }),
       );
-
-      const tickCount = 5;
-      for (let i = 0; i <= tickCount; i += 1) {
-        const ratio = i / tickCount;
-        const domainY = axis.yRange[0] + ratio * (axis.yRange[1] - axis.yRange[0]);
-        const y = this.toScreen(axis, { x: axis.xRange[0], y: domainY }).y;
-
-        layer.append(
-          createSvg("line", {
-            x1: String(xZero - 6),
-            y1: String(y),
-            x2: String(xZero + 6),
-            y2: String(y),
-            stroke: tickColor,
-            "stroke-width": "1.2",
-          }),
-        );
-
-        const tickLabel = createSvg("text", {
-          x: String(xZero - 12),
-          y: String(y + 4),
-          fill: "#000",
-          "font-size": "12",
-          "text-anchor": "end",
-        });
-        tickLabel.textContent = domainY.toFixed(1).replace(/\.0$/, "");
-        layer.append(tickLabel);
-      }
-
-      if (axis.yLabel) {
-        const label = createSvg("text", {
-          x: String(bounds.x - 52),
-          y: String(bounds.y + bounds.height / 2),
-          fill: labelColor,
-          "font-size": "14",
-          "font-weight": "600",
-          "text-anchor": "middle",
-          transform: `rotate(-90 ${bounds.x - 52} ${bounds.y + bounds.height / 2})`,
-        });
-        label.textContent = axis.yLabel;
-        layer.append(label);
-      }
     }
   }
 
@@ -388,50 +324,33 @@ export class SvgRenderer {
 
   private renderLineLabels(axis: AxisConfig, lines: LineState[]): void {
     const layer = this.layers.labels;
+    const labelPlacements = placeLineLabels(
+      lines,
+      (point) => this.toScreen(axis, point),
+      { bounds: this.getChartBounds() },
+    );
 
-    for (const line of lines) {
-      const last = line.points[line.points.length - 1];
-      if (!last) continue;
-
-      let labelPoint: Vec2;
-      if (line.label.mode === "manual" && line.label.position) {
-        labelPoint = this.toScreen(axis, line.label.position);
-      } else {
-        const endpoint = this.toScreen(axis, { x: last.x, y: last.y });
-        labelPoint = { x: endpoint.x + 10, y: endpoint.y - 8 };
-      }
-
+    for (const label of labelPlacements) {
       const text = createSvg("text", {
-        x: String(labelPoint.x),
-        y: String(labelPoint.y),
-        fill: "#000",
+        x: String(label.position.x),
+        y: String(label.position.y),
+        fill: label.color,
         "font-size": "14",
         "font-weight": "600",
       });
-      text.textContent = line.label.text;
+      text.textContent = label.text;
       layer.append(text);
     }
   }
 
-  private renderBands(axis: AxisConfig, lines: LineState[], bands: BandState[]): void {
+  private renderBands(axis: AxisConfig, lines: LineState[], bands: BandState[]): Map<string, SVGPathElement> {
     const layer = this.layers.bands;
     const lineMap = new Map(lines.map((line) => [line.id, line] as const));
+    const renderedBands = new Map<string, SVGPathElement>();
 
     for (const band of bands) {
-      const upper = lineMap.get(band.upperLineId);
-      const lower = lineMap.get(band.lowerLineId);
-      if (!upper || !lower) continue;
-
-      const upperPoints = this.filterBandPoints(upper.points, band.xMin, band.xMax);
-      const lowerPoints = this.filterBandPoints(lower.points, band.xMin, band.xMax);
-      if (upperPoints.length < 2 || lowerPoints.length < 2) continue;
-
-      const outline = [
-        ...upperPoints.map((point) => this.toScreen(axis, point)),
-        ...lowerPoints.reverse().map((point) => this.toScreen(axis, point)),
-      ];
-
-      const d = outline.map((point, index) => `${index === 0 ? "M" : "L"} ${point.x} ${point.y}`).join(" ") + " Z";
+      const d = buildBandPath(band, lineMap, (point) => this.toScreen(axis, point));
+      if (!d) continue;
 
       const path = createSvg("path", {
         d,
@@ -440,13 +359,58 @@ export class SvgRenderer {
       });
       path.setAttribute("data-band-id", band.id);
       layer.append(path);
+      renderedBands.set(band.id, path);
     }
+
+    return renderedBands;
   }
 
-  private filterBandPoints(points: BezierPoint[], xMin?: number, xMax?: number): Vec2[] {
-    return points
-      .filter((point) => (xMin === undefined || point.x >= xMin) && (xMax === undefined || point.x <= xMax))
-      .map((point) => ({ x: point.x, y: point.y }));
+  private async animateBandReveal(
+    path: SVGPathElement,
+    bandId: string,
+    options: {
+      durationMs: number;
+      easing: EasingName;
+      shouldCancel?: () => boolean;
+    },
+  ): Promise<void> {
+    const duration = Math.max(0, options.durationMs);
+    if (duration === 0) {
+      return;
+    }
+
+    const bbox = path.getBBox();
+    if (bbox.width <= 0 || bbox.height <= 0) {
+      return;
+    }
+
+    const clipId = `band-reveal-${sanitizeId(bandId)}-${this.transitionVersion}`;
+    const clipPath = createSvg("clipPath", {
+      id: clipId,
+      clipPathUnits: "userSpaceOnUse",
+    });
+    const clipRect = createSvg("rect", {
+      x: String(bbox.x),
+      y: String(bbox.y),
+      width: "0",
+      height: String(bbox.height),
+    });
+
+    clipPath.append(clipRect);
+    this.defs.append(clipPath);
+    path.setAttribute("clip-path", `url(#${clipId})`);
+
+    await animateProgress({
+      durationMs: duration,
+      easing: options.easing,
+      shouldCancel: options.shouldCancel,
+      onFrame: (progress) => {
+        clipRect.setAttribute("width", String(bbox.width * progress));
+      },
+    });
+
+    path.removeAttribute("clip-path");
+    clipPath.remove();
   }
 
   private buildLinePath(axis: AxisConfig, points: BezierPoint[]): string {
@@ -487,4 +451,54 @@ function createSvg<K extends keyof SVGElementTagNameMap>(
     element.setAttribute(name, value);
   }
   return element;
+}
+
+function sanitizeId(value: string): string {
+  return value.replace(/[^A-Za-z0-9_-]/g, "-");
+}
+
+function easingFunction(name: EasingName): (value: number) => number {
+  if (name === "easeOutCubic") {
+    return (value) => 1 - Math.pow(1 - value, 3);
+  }
+  if (name === "easeInOutCubic") {
+    return (value) => (value < 0.5 ? 4 * value * value * value : 1 - Math.pow(-2 * value + 2, 3) / 2);
+  }
+  return (value) => value;
+}
+
+async function animateProgress(options: {
+  durationMs: number;
+  easing: EasingName;
+  shouldCancel?: () => boolean;
+  onFrame: (progress: number) => void;
+}): Promise<void> {
+  const duration = Math.max(0, options.durationMs);
+  if (duration === 0) {
+    options.onFrame(1);
+    return;
+  }
+
+  const easing = easingFunction(options.easing);
+
+  return new Promise((resolve) => {
+    const start = performance.now();
+    const tick = (now: number) => {
+      if (options.shouldCancel?.()) {
+        resolve();
+        return;
+      }
+
+      const elapsed = now - start;
+      const linearProgress = Math.min(1, elapsed / duration);
+      options.onFrame(easing(linearProgress));
+      if (linearProgress >= 1) {
+        resolve();
+        return;
+      }
+      requestAnimationFrame(tick);
+    };
+
+    requestAnimationFrame(tick);
+  });
 }

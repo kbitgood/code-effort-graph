@@ -19,6 +19,12 @@ const baseLineStyle = {
   opacity: 1,
 };
 
+const supportLineStyle = {
+  color: "#ea580c",
+  width: 3,
+  opacity: 1,
+};
+
 const lineEnter: LineState = {
   id: "line-core-effort",
   style: baseLineStyle,
@@ -47,6 +53,24 @@ const lineMorphed: LineState = {
     { x: 2.8, y: 3.7, cpIn: { x: 2.3, y: 4.4 }, cpOut: { x: 3.0, y: 3.3 } },
     { x: 4.2, y: 6.8, cpIn: { x: 3.6, y: 5.1 }, cpOut: { x: 4.8, y: 7.3 } },
     { x: 5.6, y: 7.4, cpIn: { x: 5.1, y: 7.1 } },
+  ],
+};
+
+const supportLine: LineState = {
+  id: "line-support-load",
+  style: supportLineStyle,
+  label: {
+    text: "Support Load",
+    mode: "manual",
+    position: { x: 4.8, y: 6.0 },
+  },
+  drawOnEnter: true,
+  points: [
+    { x: 0.3, y: 1.2 },
+    { x: 1.4, y: 2.7, cpIn: { x: 0.9, y: 2.0 }, cpOut: { x: 1.8, y: 3.2 } },
+    { x: 2.8, y: 3.3, cpIn: { x: 2.2, y: 3.6 }, cpOut: { x: 3.1, y: 3.1 } },
+    { x: 4.2, y: 6.0, cpIn: { x: 3.6, y: 4.7 }, cpOut: { x: 4.7, y: 6.5 } },
+    { x: 5.6, y: 7.1, cpIn: { x: 5.1, y: 6.9 } },
   ],
 };
 
@@ -166,6 +190,58 @@ export const presentationConfig: PresentationConfig = {
         },
         lines: [lineMorphed],
         bands: [],
+      },
+    },
+    {
+      id: "step-6-bands-and-labels",
+      timing: {
+        durationMs: 900,
+        easing: "easeInOutCubic",
+      },
+      scene: {
+        axes: {
+          ...baseAxes,
+          yVisible: true,
+          xLabel: "Timeline",
+          yLabel: "Code Effort",
+        },
+        words: [],
+        endpointTerms: {
+          start: "Problem",
+          end: "Outcome",
+        },
+        lines: [lineMorphed, supportLine],
+        bands: [],
+      },
+    },
+    {
+      id: "step-7-band-reveal",
+      timing: {
+        durationMs: 850,
+        easing: "easeOutCubic",
+      },
+      scene: {
+        axes: {
+          ...baseAxes,
+          yVisible: true,
+          xLabel: "Timeline",
+          yLabel: "Code Effort",
+        },
+        words: [],
+        endpointTerms: {
+          start: "Problem",
+          end: "Outcome",
+        },
+        lines: [lineMorphed, supportLine],
+        bands: [
+          {
+            id: "band-gap-core-vs-support",
+            upperLineId: "line-core-effort",
+            lowerLineId: "line-support-load",
+            fill: "#60a5fa",
+            opacity: 0.25,
+          },
+        ],
       },
     },
   ],

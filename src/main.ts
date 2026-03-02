@@ -123,6 +123,13 @@ if (app) {
   step5.style.fontWeight = "600";
   app.append(step5);
 
+  const step6 = document.createElement("p");
+  step6.textContent = "Step 6 complete: band shading and line label placement are enabled.";
+  step6.style.marginTop = "8px";
+  step6.style.color = "#000";
+  step6.style.fontWeight = "600";
+  app.append(step6);
+
   const controlsHint = document.createElement("p");
   controlsHint.textContent =
     "Controls: click anywhere to advance, ArrowLeft/ArrowRight or Space/Shift+Space to navigate, Enter/R to reset.";

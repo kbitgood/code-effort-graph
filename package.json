@@ -1,0 +1,16 @@
+{
+  "name": "code-effort-graph",
+  "module": "server.ts",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "bun --watch server.ts",
+    "start": "bun run server.ts"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  }
+}

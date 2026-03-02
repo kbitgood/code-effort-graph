@@ -1,7 +1,6 @@
 import { presentationConfig } from "./presentation/config";
 import { PresentationController } from "./core/controller";
-import { summarizeDiff } from "./core/diff";
-import { LAYER_ORDER, SvgRenderer } from "./render/svg-renderer";
+import { SvgRenderer } from "./render/svg-renderer";
 import { mountShaderBackground } from "./shader-background";
 
 mountShaderBackground();
@@ -9,81 +8,48 @@ mountShaderBackground();
 const app = document.querySelector<HTMLDivElement>("#app");
 
 if (app) {
-  const status = document.createElement("p");
-  status.textContent = "Browser entry loaded from src/main.ts";
-  status.style.marginTop = "16px";
-  status.style.color = "#000";
-  status.style.fontWeight = "600";
-  app.append(status);
+  app.replaceChildren();
 
-  const step2 = document.createElement("p");
-  step2.textContent = `Step 2 complete: ${presentationConfig.steps.length} typed presentation steps configured.`;
-  step2.style.marginTop = "8px";
-  step2.style.color = "#000";
-  step2.style.fontWeight = "600";
-  app.append(step2);
-
-  const ids = document.createElement("p");
-  ids.textContent = `Step IDs: ${presentationConfig.steps.map((step) => step.id).join(", ")}`;
-  ids.style.marginTop = "8px";
-  ids.style.color = "#000";
-  ids.style.fontSize = "0.95rem";
-  app.append(ids);
+  const chartHost = document.createElement("section");
+  chartHost.className = "graph-scene";
+  app.append(chartHost);
 
   const controls = document.createElement("div");
-  controls.style.display = "flex";
-  controls.style.gap = "8px";
-  controls.style.marginTop = "14px";
-  controls.style.alignItems = "center";
+  controls.className = "nav-controls";
   app.append(controls);
 
   const prevButton = document.createElement("button");
   prevButton.type = "button";
+  prevButton.className = "nav-button";
   prevButton.dataset.navControl = "prev";
   prevButton.textContent = "Prev";
-  styleButton(prevButton);
   controls.append(prevButton);
 
   const nextButton = document.createElement("button");
   nextButton.type = "button";
+  nextButton.className = "nav-button";
   nextButton.dataset.navControl = "next";
   nextButton.textContent = "Next";
-  styleButton(nextButton);
   controls.append(nextButton);
 
   const resetButton = document.createElement("button");
   resetButton.type = "button";
+  resetButton.className = "nav-button";
   resetButton.dataset.navControl = "reset";
   resetButton.textContent = "Reset";
-  styleButton(resetButton);
   controls.append(resetButton);
 
-  const stepMeta = document.createElement("span");
-  stepMeta.style.marginLeft = "6px";
-  stepMeta.style.fontWeight = "600";
-  stepMeta.style.color = "#000";
-  controls.append(stepMeta);
-
-  const diffMeta = document.createElement("p");
-  diffMeta.style.marginTop = "10px";
-  diffMeta.style.color = "#000";
-  diffMeta.style.fontSize = "0.9rem";
-  app.append(diffMeta);
-
-  const chartHost = document.createElement("section");
-  chartHost.style.marginTop = "20px";
-  chartHost.style.width = "100%";
-  app.append(chartHost);
+  const fullscreenButton = document.createElement("button");
+  fullscreenButton.type = "button";
+  fullscreenButton.className = "nav-button";
+  fullscreenButton.dataset.navControl = "fullscreen";
+  fullscreenButton.textContent = "Fullscreen";
+  controls.append(fullscreenButton);
 
   const renderer = new SvgRenderer(chartHost);
   const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  let latestTransitionId = 0;
   const controller = new PresentationController(presentationConfig.steps, {
-    onTransition: async ({ fromIndex, toIndex, previousStep, step, diff, transitionId }) => {
-      latestTransitionId = Math.max(latestTransitionId, transitionId);
-      stepMeta.textContent = `Step ${toIndex + 1} / ${presentationConfig.steps.length}: ${step.id}`;
-      diffMeta.textContent = `Diff: ${summarizeDiff(diff)}`;
-
+    onTransition: async ({ fromIndex, toIndex, previousStep, step, diff }) => {
       if (fromIndex === toIndex) {
         renderer.render(step.scene);
       } else {
@@ -93,72 +59,26 @@ if (app) {
           reducedMotion: prefersReducedMotion,
         });
       }
-
-      if (transitionId !== latestTransitionId) {
-        return;
-      }
-      stepMeta.textContent = `Step ${toIndex + 1} / ${presentationConfig.steps.length}: ${step.id}`;
-      diffMeta.textContent = `Diff: ${summarizeDiff(diff)}`;
     },
   });
-
-  const step3 = document.createElement("p");
-  step3.textContent = `Step 3 complete: static SVG renderer with layers (${LAYER_ORDER.join(", ")})`;
-  step3.style.marginTop = "12px";
-  step3.style.color = "#000";
-  step3.style.fontWeight = "600";
-  app.append(step3);
-
-  const step4 = document.createElement("p");
-  step4.textContent = "Step 4 complete: diff engine + navigation controller (click, ←/→, R).";
-  step4.style.marginTop = "8px";
-  step4.style.color = "#000";
-  step4.style.fontWeight = "600";
-  app.append(step4);
-
-  const step5 = document.createElement("p");
-  step5.textContent = "Step 5 complete: line draw-on-enter and line morph animation are enabled.";
-  step5.style.marginTop = "8px";
-  step5.style.color = "#000";
-  step5.style.fontWeight = "600";
-  app.append(step5);
-
-  const step6 = document.createElement("p");
-  step6.textContent = "Step 6 complete: band shading and line label placement are enabled.";
-  step6.style.marginTop = "8px";
-  step6.style.color = "#000";
-  step6.style.fontWeight = "600";
-  app.append(step6);
-
-  const step7 = document.createElement("p");
-  step7.textContent = "Step 7 complete: initial storyboard sequence is encoded end-to-end.";
-  step7.style.marginTop = "8px";
-  step7.style.color = "#000";
-  step7.style.fontWeight = "600";
-  app.append(step7);
-
-  const controlsHint = document.createElement("p");
-  controlsHint.textContent =
-    "Controls: click anywhere to advance, ArrowLeft/ArrowRight or Space/Shift+Space to navigate, Enter/R to reset.";
-  controlsHint.style.marginTop = "8px";
-  controlsHint.style.fontSize = "0.95rem";
-  controlsHint.style.color = "#000";
-  app.append(controlsHint);
 
   prevButton.addEventListener("click", () => controller.prev());
   nextButton.addEventListener("click", () => controller.next());
   resetButton.addEventListener("click", () => controller.reset());
+  fullscreenButton.addEventListener("click", async () => {
+    if (document.fullscreenElement) {
+      await document.exitFullscreen();
+      return;
+    }
+    await document.documentElement.requestFullscreen();
+  });
+
+  const syncFullscreenLabel = () => {
+    fullscreenButton.textContent = document.fullscreenElement ? "Exit Fullscreen" : "Fullscreen";
+  };
+  document.addEventListener("fullscreenchange", syncFullscreenLabel);
+  syncFullscreenLabel();
 
   controller.bindDefaultInputs(document);
   controller.emitCurrent();
-}
-
-function styleButton(button: HTMLButtonElement): void {
-  button.style.border = "1px solid #000";
-  button.style.background = "transparent";
-  button.style.color = "#000";
-  button.style.padding = "6px 10px";
-  button.style.borderRadius = "8px";
-  button.style.fontWeight = "600";
-  button.style.cursor = "pointer";
 }

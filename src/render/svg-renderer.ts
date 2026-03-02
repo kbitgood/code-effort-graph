@@ -63,7 +63,7 @@ export class SvgRenderer {
     this.svg = document.createElementNS(SVG_NS, "svg");
     this.svg.setAttribute("viewBox", `0 0 ${this.width} ${this.height}`);
     this.svg.setAttribute("width", "100%");
-    this.svg.setAttribute("height", String(this.height));
+    this.svg.setAttribute("height", "100%");
     this.svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
     this.svg.setAttribute("role", "img");
     this.svg.setAttribute("aria-label", "Code effort graph scene");
@@ -123,6 +123,8 @@ export class SvgRenderer {
     this.renderEndpointTerms(nextScene.axes, nextScene.endpointTerms);
     const renderedBands = this.renderBands(nextScene.axes, nextScene.lines, nextScene.bands);
 
+    const previousBandById = new Map(previousScene.bands.map((band) => [band.id, band] as const));
+    const nextBandById = new Map(nextScene.bands.map((band) => [band.id, band] as const));
     const previousLineById = new Map(previousScene.lines.map((line) => [line.id, line] as const));
     const initialLinePoints = new Map<string, BezierPoint[]>();
 
@@ -166,6 +168,20 @@ export class SvgRenderer {
       if (!path) continue;
       animationTasks.push(
         this.animateBandReveal(path, bandId, {
+          durationMs,
+          easing,
+          shouldCancel: () => this.transitionVersion !== version,
+        }),
+      );
+    }
+
+    for (const bandId of diff.bands.updated) {
+      const path = renderedBands.get(bandId);
+      const previousBand = previousBandById.get(bandId);
+      const nextBand = nextBandById.get(bandId);
+      if (!path || !previousBand || !nextBand) continue;
+      animationTasks.push(
+        this.animateBandMorph(path, previousBand, nextBand, previousScene, nextScene, {
           durationMs,
           easing,
           shouldCancel: () => this.transitionVersion !== version,
@@ -486,6 +502,102 @@ export class SvgRenderer {
     clipPath.remove();
   }
 
+  private async animateBandMorph(
+    path: SVGPathElement,
+    previousBand: BandState,
+    nextBand: BandState,
+    previousScene: SceneState,
+    nextScene: SceneState,
+    options: {
+      durationMs: number;
+      easing: EasingName;
+      shouldCancel?: () => boolean;
+    },
+  ): Promise<void> {
+    if (options.durationMs <= 0) {
+      return;
+    }
+
+    const previousLineById = new Map(previousScene.lines.map((line) => [line.id, line] as const));
+    const nextLineById = new Map(nextScene.lines.map((line) => [line.id, line] as const));
+
+    const applyBandFrame = (progress: number): void => {
+      const bandAtProgress = interpolateBand(previousBand, nextBand, previousScene.axes, nextScene.axes, progress);
+      const bandPath = buildBandPath(
+        bandAtProgress,
+        this.buildInterpolatedBandLineMap(previousBand, nextBand, previousLineById, nextLineById, progress),
+        (point) => this.toScreen(nextScene.axes, point),
+      );
+      if (bandPath) {
+        path.setAttribute("d", bandPath);
+      }
+      path.setAttribute("fill", interpolateColor(previousBand.fill, nextBand.fill, progress));
+      path.setAttribute("fill-opacity", String(lerp(previousBand.opacity, nextBand.opacity, progress)));
+    };
+
+    applyBandFrame(0);
+    await animateProgress({
+      durationMs: options.durationMs,
+      easing: options.easing,
+      shouldCancel: options.shouldCancel,
+      onFrame: applyBandFrame,
+    });
+  }
+
+  private buildInterpolatedBandLineMap(
+    previousBand: BandState,
+    nextBand: BandState,
+    previousLineById: Map<string, LineState>,
+    nextLineById: Map<string, LineState>,
+    progress: number,
+  ): Map<string, LineState> {
+    const lines = new Map<string, LineState>();
+    const upperLine = this.interpolateBandLine(
+      previousBand.upperLineId,
+      nextBand.upperLineId,
+      previousLineById,
+      nextLineById,
+      progress,
+    );
+    const lowerLine = this.interpolateBandLine(
+      previousBand.lowerLineId,
+      nextBand.lowerLineId,
+      previousLineById,
+      nextLineById,
+      progress,
+    );
+
+    if (upperLine) {
+      lines.set(nextBand.upperLineId, upperLine);
+      lines.set(previousBand.upperLineId, upperLine);
+    }
+    if (lowerLine) {
+      lines.set(nextBand.lowerLineId, lowerLine);
+      lines.set(previousBand.lowerLineId, lowerLine);
+    }
+
+    return lines;
+  }
+
+  private interpolateBandLine(
+    previousLineId: string,
+    nextLineId: string,
+    previousLineById: Map<string, LineState>,
+    nextLineById: Map<string, LineState>,
+    progress: number,
+  ): LineState | null {
+    const fromLine = previousLineById.get(previousLineId) ?? previousLineById.get(nextLineId);
+    const toLine = nextLineById.get(nextLineId) ?? nextLineById.get(previousLineId);
+    if (!fromLine || !toLine) {
+      return null;
+    }
+
+    return {
+      ...toLine,
+      points: interpolateBezierPoints(fromLine.points, toLine.points, progress),
+    };
+  }
+
   private buildLinePath(axis: AxisConfig, points: BezierPoint[]): string {
     const [first, ...rest] = points;
     if (!first) return "";
@@ -536,6 +648,89 @@ function createSvg<K extends keyof SVGElementTagNameMap>(
 
 function sanitizeId(value: string): string {
   return value.replace(/[^A-Za-z0-9_-]/g, "-");
+}
+
+function interpolateBand(
+  previousBand: BandState,
+  nextBand: BandState,
+  previousAxis: AxisConfig,
+  nextAxis: AxisConfig,
+  progress: number,
+): BandState {
+  const previousMin = previousBand.xMin ?? previousAxis.xRange[0];
+  const nextMin = nextBand.xMin ?? nextAxis.xRange[0];
+  const previousMax = previousBand.xMax ?? previousAxis.xRange[1];
+  const nextMax = nextBand.xMax ?? nextAxis.xRange[1];
+
+  return {
+    ...nextBand,
+    xMin: lerp(previousMin, nextMin, progress),
+    xMax: lerp(previousMax, nextMax, progress),
+    opacity: lerp(previousBand.opacity, nextBand.opacity, progress),
+  };
+}
+
+function interpolateBezierPoints(fromPoints: BezierPoint[], toPoints: BezierPoint[], t: number): BezierPoint[] {
+  if (fromPoints.length !== toPoints.length) {
+    return t < 1 ? fromPoints : toPoints;
+  }
+
+  return fromPoints.map((from, index) => {
+    const to = toPoints[index]!;
+    return {
+      x: lerp(from.x, to.x, t),
+      y: lerp(from.y, to.y, t),
+      cpIn: interpolateMaybeVec2(from.cpIn, to.cpIn, t),
+      cpOut: interpolateMaybeVec2(from.cpOut, to.cpOut, t),
+    };
+  });
+}
+
+function interpolateMaybeVec2(from: Vec2 | undefined, to: Vec2 | undefined, t: number): Vec2 | undefined {
+  if (!from && !to) return undefined;
+  const fromPoint = from ?? to!;
+  const toPoint = to ?? from!;
+  return {
+    x: lerp(fromPoint.x, toPoint.x, t),
+    y: lerp(fromPoint.y, toPoint.y, t),
+  };
+}
+
+function parseHexColor(value: string): [number, number, number] | null {
+  const hex = value.trim();
+  if (/^#([a-f\d]{3})$/i.test(hex)) {
+    const [r, g, b] = hex
+      .slice(1)
+      .split("")
+      .map((part) => Number.parseInt(part + part, 16));
+    return [r!, g!, b!];
+  }
+  if (/^#([a-f\d]{6})$/i.test(hex)) {
+    return [
+      Number.parseInt(hex.slice(1, 3), 16),
+      Number.parseInt(hex.slice(3, 5), 16),
+      Number.parseInt(hex.slice(5, 7), 16),
+    ];
+  }
+  return null;
+}
+
+function interpolateColor(from: string, to: string, t: number): string {
+  const fromRgb = parseHexColor(from);
+  const toRgb = parseHexColor(to);
+  if (!fromRgb || !toRgb) {
+    return t < 1 ? from : to;
+  }
+
+  const r = Math.round(lerp(fromRgb[0], toRgb[0], t));
+  const g = Math.round(lerp(fromRgb[1], toRgb[1], t));
+  const b = Math.round(lerp(fromRgb[2], toRgb[2], t));
+
+  return `rgb(${r}, ${g}, ${b})`;
+}
+
+function lerp(from: number, to: number, t: number): number {
+  return from + (to - from) * t;
 }
 
 function easingFunction(name: EasingName): (value: number) => number {

@@ -1,16 +1,16 @@
-import type { PresentationConfig } from "./types";
+import type { LineState, PresentationConfig } from "./types";
 
 const firstSlideItems = [
-  "Internal Tooling",
-  "Dev Tooling",
-  "CI/CD Scripts",
-  "Unit Tests",
-  "E2E Tests",
-  "Infrastructure",
-  "App Code",
-  "LTI Code",
-  "Quiz Code",
-  "Lesson Code",
+  "internal tooling",
+  "dev tooling",
+  "ci/cd scripts",
+  "unit tests",
+  "e2e tests",
+  "infrastructure",
+  "app code",
+  "lti code",
+  "quiz code",
+  "lesson code",
 ];
 
 const lineSpacingPx = 38;
@@ -23,7 +23,7 @@ const positionedItems = firstSlideItems.map((text, index, all) => ({
 
 const hiddenImpactTitlePreAxis = {
   id: "impact-title",
-  text: "Impact of Mistakes",
+  text: "impact of mistakes",
   xTarget: 5,
   yOffsetPx: 176,
   fontSizePx: 22,
@@ -58,7 +58,7 @@ const axisAlignedItems = firstSlideItems.map((text, index) => ({
 const impactSideLabels = [
   {
     id: "impact-low",
-    text: "Low Impact",
+    text: "low impact",
     xTarget: 0.8,
     yOffsetPx: 34,
     fontSizePx: 18,
@@ -66,7 +66,7 @@ const impactSideLabels = [
   },
   {
     id: "impact-critical",
-    text: "Critical Impact",
+    text: "critical impact",
     xTarget: 10.2,
     yOffsetPx: 34,
     fontSizePx: 18,
@@ -76,7 +76,7 @@ const impactSideLabels = [
 
 const impactTitleAboveLine = {
   id: "impact-title",
-  text: "Impact of Mistakes",
+  text: "impact of mistakes",
   xTarget: 5.5,
   yOffsetPx: -28,
   fontSizePx: 22,
@@ -85,7 +85,7 @@ const impactTitleAboveLine = {
 
 const impactTitleFinal = {
   id: "impact-title",
-  text: "Impact of Mistakes",
+  text: "impact of mistakes",
   xTarget: 5.5,
   yOffsetPx: 64,
   fontSizePx: 22,
@@ -112,10 +112,68 @@ const visibleImpactTitleFinal = {
   opacity: 1,
 };
 
+const yAxisLabel = {
+  id: "effort-axis-label",
+  text: "effort or something ¯\\_(ツ)_/¯",
+  xTarget: -0.75,
+  yOffsetPx: -192,
+  fontSizePx: 22,
+  fontWeight: 700,
+  rotateDeg: -90,
+};
+
+const hiddenYAxisLabel = {
+  ...yAxisLabel,
+  opacity: 0,
+};
+
+const visibleYAxisLabel = {
+  ...yAxisLabel,
+  opacity: 1,
+};
+
 const fadedAxisAlignedItems = axisAlignedItems.map((word) => ({
   ...word,
   opacity: 0,
 }));
+
+const maxEffortLine: LineState = {
+  id: "line-max-effort",
+  points: [
+    { x: 0, y: 0 },
+    { x: 11, y: 10 },
+  ],
+  style: {
+    color: "#dc2626",
+    width: 3,
+    opacity: 1,
+  },
+  label: {
+    text: "max effort",
+    mode: "manual",
+    position: { x: 11.5, y: 10 },
+  },
+  drawOnEnter: true,
+};
+
+const devEffortLine: LineState = {
+  id: "line-dev-effort",
+  points: [
+    { x: 0, y: 4 },
+    { x: 11, y: 4 },
+  ],
+  style: {
+    color: "#2563eb",
+    width: 3,
+    opacity: 1,
+  },
+  label: {
+    text: "dev effort",
+    mode: "manual",
+    position: { x: 11.5, y: 4 },
+  },
+  drawOnEnter: true,
+};
 
 const steps = [
   ...buildUpSteps,
@@ -155,9 +213,67 @@ const steps = [
         ...fadedAxisAlignedItems,
         ...visibleImpactSideLabels,
         visibleImpactTitleFinal,
+        hiddenYAxisLabel,
       ],
       endpointTerms: {},
       lines: [],
+      bands: [],
+    },
+  },
+  {
+    id: "step-13-y-axis-wipe",
+    timing: {
+      durationMs: 1000,
+      easing: "easeInOutCubic" as const,
+    },
+    scene: {
+      axes: {
+        xVisible: true,
+        yVisible: true,
+        xRange: [0, 11] as [number, number],
+        yRange: [0, 10] as [number, number],
+      },
+      words: [...fadedAxisAlignedItems, ...visibleImpactSideLabels, visibleImpactTitleFinal, visibleYAxisLabel],
+      endpointTerms: {},
+      lines: [],
+      bands: [],
+    },
+  },
+  {
+    id: "step-14-max-effort-line",
+    timing: {
+      durationMs: 1000,
+      easing: "easeInOutCubic" as const,
+    },
+    scene: {
+      axes: {
+        xVisible: true,
+        yVisible: true,
+        xRange: [0, 11] as [number, number],
+        yRange: [0, 10] as [number, number],
+      },
+      words: [...fadedAxisAlignedItems, ...visibleImpactSideLabels, visibleImpactTitleFinal, visibleYAxisLabel],
+      endpointTerms: {},
+      lines: [maxEffortLine],
+      bands: [],
+    },
+  },
+  {
+    id: "step-15-dev-effort-line",
+    timing: {
+      durationMs: 1000,
+      easing: "easeInOutCubic" as const,
+    },
+    scene: {
+      axes: {
+        xVisible: true,
+        yVisible: true,
+        xRange: [0, 11] as [number, number],
+        yRange: [0, 10] as [number, number],
+      },
+      words: [...fadedAxisAlignedItems, ...visibleImpactSideLabels, visibleImpactTitleFinal, visibleYAxisLabel],
+      endpointTerms: {},
+      lines: [maxEffortLine, devEffortLine],
       bands: [],
     },
   },

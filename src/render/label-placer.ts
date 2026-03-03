@@ -57,14 +57,13 @@ export function placeLineLabels(
   const occupied: Vec2[] = [];
 
   for (const candidate of candidates.filter((item) => item.manual)) {
-    const manualPosition = clampToBounds(candidate.basePosition, options.bounds, options.boundsPadding);
     resolvedById.set(candidate.lineId, {
       lineId: candidate.lineId,
       text: candidate.text,
-      position: manualPosition,
+      position: candidate.basePosition,
       color: candidate.color,
     });
-    occupied.push(manualPosition);
+    occupied.push(candidate.basePosition);
   }
 
   const autoCandidates = candidates

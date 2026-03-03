@@ -39,7 +39,7 @@ type EasingName = TransitionOptions["easing"];
 
 const DEFAULT_MARGINS: Margins = {
   top: 40,
-  right: 56,
+  right: 180,
   bottom: 72,
   left: 72,
 };
@@ -141,10 +141,10 @@ export class SvgRenderer {
     const durationMs = options.reducedMotion ? 0 : options.durationMs;
     const easing = options.easing;
     const animationTasks: Array<Promise<void>> = [];
-    const axisEntered =
-      (!previousScene.axes.xVisible && nextScene.axes.xVisible) ||
-      (!previousScene.axes.yVisible && nextScene.axes.yVisible);
-    if (axisEntered) {
+    const xAxisEntered = !previousScene.axes.xVisible && nextScene.axes.xVisible;
+    const yAxisEntered = !previousScene.axes.yVisible && nextScene.axes.yVisible;
+
+    if (xAxisEntered) {
       this.layers.axes.setAttribute("opacity", "0");
       animationTasks.push(
         this.animateLayerOpacity(this.layers.axes, 0, 1, {
@@ -153,6 +153,23 @@ export class SvgRenderer {
           shouldCancel: () => this.transitionVersion !== version,
         }),
       );
+    }
+
+    if (yAxisEntered) {
+      const yAxisLine = this.layers.axes.querySelector<SVGLineElement>('line[data-axis="y"]');
+      if (yAxisLine) {
+        const xAxisY = this.toScreen(nextScene.axes, { x: nextScene.axes.xRange[0], y: 0 }).y;
+        const topY = Number(yAxisLine.getAttribute("y1") ?? xAxisY);
+        yAxisLine.setAttribute("y1", String(xAxisY));
+        yAxisLine.setAttribute("y2", String(xAxisY));
+        animationTasks.push(
+          this.animateYAxisWipeUp(yAxisLine, xAxisY, topY, {
+            durationMs,
+            easing,
+            shouldCancel: () => this.transitionVersion !== version,
+          }),
+        );
+      }
     }
 
     const nextWordById = new Map(nextScene.words.map((word) => [word.id, word] as const));
@@ -285,6 +302,7 @@ export class SvgRenderer {
         y2: String(yZero),
         stroke: axisColor,
         "stroke-width": "2",
+        "data-axis": "x",
       });
       layer.append(xLine);
     }
@@ -299,6 +317,7 @@ export class SvgRenderer {
           y2: String(bounds.y + bounds.height),
           stroke: axisColor,
           "stroke-width": "2",
+          "data-axis": "y",
         }),
       );
     }
@@ -468,6 +487,34 @@ export class SvgRenderer {
       onFrame: (progress) => {
         const value = from + (to - from) * progress;
         element.setAttribute("opacity", String(value));
+      },
+    });
+  }
+
+  private async animateYAxisWipeUp(
+    line: SVGLineElement,
+    fromY: number,
+    toY: number,
+    options: {
+      durationMs: number;
+      easing: EasingName;
+      shouldCancel?: () => boolean;
+    },
+  ): Promise<void> {
+    if (options.durationMs <= 0) {
+      line.setAttribute("y1", String(toY));
+      line.setAttribute("y2", String(fromY));
+      return;
+    }
+
+    await animateProgress({
+      durationMs: options.durationMs,
+      easing: options.easing,
+      shouldCancel: options.shouldCancel,
+      onFrame: (progress) => {
+        const currentTop = fromY + (toY - fromY) * progress;
+        line.setAttribute("y1", String(currentTop));
+        line.setAttribute("y2", String(fromY));
       },
     });
   }
